@@ -7,6 +7,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,30 +17,62 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
-func download(prefix string) (url string, content []byte, err error) {
-	year := time.Now().Year()
+const MC_VERSION = "v1.3.4"
 
-	site := "https://www.sqlite.org/download.html"
-	//fmt.Printf("scraping %v\n", site)
-	doc, err := goquery.NewDocument(site)
+type GithubRes []Item
+
+type Item struct {
+	TagName string `json:"tag_name"`
+	Assets  Assets
+}
+
+type Assets []struct {
+	Name               string
+	BrowserDownloadUrl string `json:"browser_download_url"`
+}
+
+func getAmagationZipUrl() string {
+	// https://api.github.com/repos/utelle/SQLite3MultipleCiphers/releases
+	//jq -r ".[].assets[] | select(.name | contains(\"$(version)-amalgamation\")) | .created_at |= fromdateiso8601 | .browser_download_url" | head -1 | wget -O $@ -i -
+
+	resp, err := http.Get("https://api.github.com/repos/utelle/SQLite3MultipleCiphers/releases")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not get url: ", err.Error())
 	}
+	defer resp.Body.Close()
 
-	doc.Find("a").Each(func(_ int, s *goquery.Selection) {
-		if strings.HasPrefix(s.Text(), prefix) {
-			url = fmt.Sprintf("https://www.sqlite.org/%d/", year) + s.Text()
+	items := GithubRes{}
+	bytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bytes, &items)
+
+	var asset *Assets
+
+	for _, v := range items {
+		if v.TagName == MC_VERSION {
+			asset = &v.Assets
+			break
 		}
-	})
-
-	if url == "" {
-		return "", nil, fmt.Errorf("Unable to find prefix '%s' on sqlite.org", prefix)
 	}
+
+	if asset == nil {
+		log.Fatal("Version not found !")
+	}
+
+	var downloadUrl string
+	for _, it := range *asset {
+		if strings.Contains(it.Name, "-amalgamation") {
+			downloadUrl = it.BrowserDownloadUrl
+		}
+	}
+
+	return downloadUrl
+}
+
+func download() (url string, content []byte, err error) {
+
+	url = getAmagationZipUrl()
 
 	fmt.Printf("Downloading %v\n", url)
 	resp, err := http.Get(url)
@@ -57,57 +90,13 @@ func download(prefix string) (url string, content []byte, err error) {
 	return url, content, nil
 }
 
-func mergeFile(src string, dst string) error {
-	defer func() error {
-		fmt.Printf("Removing: %s\n", src)
-		err := os.Remove(src)
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}()
-
-	// Open destination
-	fdst, err := os.OpenFile(dst, os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		return err
-	}
-	defer fdst.Close()
-
-	// Read source content
-	content, err := ioutil.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	// Add Additional newline
-	if _, err := fdst.WriteString("\n"); err != nil {
-		return err
-	}
-
-	fmt.Printf("Merging: %s into %s\n", src, dst)
-	if _, err = fdst.Write(content); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func main() {
 	fmt.Println("Go-SQLite3 Upgrade Tool")
 
 	// Download Amalgamation
-	_, amalgamation, err := download("sqlite-amalgamation-")
+	_, amalgamation, err := download()
 	if err != nil {
 		fmt.Println("Failed to download: sqlite-amalgamation; %s", err)
-	}
-
-	// Download Source
-	_, source, err := download("sqlite-src-")
-	if err != nil {
-		fmt.Println("Failed to download: sqlite-src; %s", err)
 	}
 
 	// Create Amalgamation Zip Reader
@@ -116,19 +105,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create Source Zip Reader
-	rSource, err := zip.NewReader(bytes.NewReader(source), int64(len(source)))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Extract Amalgamation
 	for _, zf := range rAmalgamation.File {
 		var f *os.File
 		switch path.Base(zf.Name) {
-		case "sqlite3.c":
+		case "sqlite3mc_amalgamation.c":
 			f, err = os.Create("sqlite3-binding.c")
-		case "sqlite3.h":
+		case "sqlite3mc_amalgamation.h":
 			f, err = os.Create("sqlite3-binding.h")
 		case "sqlite3ext.h":
 			f, err = os.Create("sqlite3ext.h")
@@ -179,43 +162,6 @@ func main() {
 		zr.Close()
 		f.Close()
 		fmt.Printf("Extracted: %v\n", filepath.Base(f.Name()))
-	}
-
-	//Extract Source
-	for _, zf := range rSource.File {
-		var f *os.File
-		switch path.Base(zf.Name) {
-		case "userauth.c":
-			f, err = os.Create("userauth.c")
-		case "sqlite3userauth.h":
-			f, err = os.Create("userauth.h")
-		default:
-			continue
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-		zr, err := zf.Open()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = io.Copy(f, zr)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		zr.Close()
-		f.Close()
-		fmt.Printf("extracted %v\n", filepath.Base(f.Name()))
-	}
-
-	// Merge SQLite User Authentication into amalgamation
-	if err := mergeFile("userauth.c", "sqlite3-binding.c"); err != nil {
-		log.Fatal(err)
-	}
-	if err := mergeFile("userauth.h", "sqlite3-binding.h"); err != nil {
-		log.Fatal(err)
 	}
 
 	os.Exit(0)
