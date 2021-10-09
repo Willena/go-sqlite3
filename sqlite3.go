@@ -10,8 +10,7 @@ package sqlite3
 
 /*
 #cgo CFLAGS: -std=gnu99
-#cgo CFLAGS: -DSQLITE_ENABLE_RTREE
-#cgo CFLAGS: -DSQLITE_THREADSAFE=1
+
 #cgo CFLAGS: -DHAVE_USLEEP=1
 #cgo CFLAGS: -DSQLITE_ENABLE_FTS3
 #cgo CFLAGS: -DSQLITE_ENABLE_FTS3_PARENTHESIS
@@ -19,8 +18,55 @@ package sqlite3
 #cgo CFLAGS: -DSQLITE_OMIT_DEPRECATED
 #cgo CFLAGS: -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1
 #cgo CFLAGS: -DSQLITE_ENABLE_UPDATE_DELETE_LIMIT
+#cgo CFLAGS: -DCODEC_TYPE=CODEC_TYPE_CHACHA20
+#cgo CFLAGS: -DSQLITE_THREADSAFE=1
+#cgo CFLAGS: -DSQLITE_DQS=0
+#cgo CFLAGS: -DSQLITE_MAX_ATTACHED=10
+#cgo CFLAGS: -DSQLITE_ENABLE_EXPLAIN_COMMENTS=1
+#cgo CFLAGS: -DSQLITE_SOUNDEX=1
+#cgo CFLAGS: -DSQLITE_ENABLE_COLUMN_METADATA=1
+#cgo CFLAGS: -DSQLITE_SECURE_DELETE=1
+#cgo CFLAGS: -DSQLITE_ENABLE_DESERIALIZE=1
+#cgo CFLAGS: -DSQLITE_ENABLE_FTS3=1
+#cgo CFLAGS: -DSQLITE_ENABLE_FTS3_PARENTHESIS=1
+#cgo CFLAGS: -DSQLITE_ENABLE_FTS4=1
+#cgo CFLAGS: -DSQLITE_ENABLE_FTS5=1
+#cgo CFLAGS: -DSQLITE_ENABLE_JSON1=1
+#cgo CFLAGS: -DSQLITE_ENABLE_RTREE=1
+#cgo CFLAGS: -DSQLITE_ENABLE_GEOPOLY=1
+#cgo CFLAGS: -DSQLITE_CORE=1
+#cgo CFLAGS: -DSQLITE_ENABLE_EXTFUNC=1
+#cgo CFLAGS: -DSQLITE_ENABLE_CSV=1
+#cgo CFLAGS: -DSQLITE_ENABLE_SHA3
+#cgo CFLAGS: -DSQLITE_ENABLE_FILEIO
+#cgo CFLAGS: -DSQLITE_ENABLE_CARRAY=1
+#cgo CFLAGS: -DSQLITE_ENABLE_SERIES=1
+#cgo CFLAGS: -DSQLITE_ENABLE_UUID=1
+#cgo CFLAGS: -DSQLITE_TEMP_STORE=2
+#cgo CFLAGS: -DSQLITE_USE_URI=1
+#cgo CFLAGS: -DSQLITE_USER_AUTHENTICATION=1
+#cgo CFLAGS: -DSQLITE_ENABLE_LOAD_EXTENSION=1
+#cgo CFLAGS: -DSQLITE_HAVE_ISNAN
+#cgo CFLAGS: -DSQLITE_HAVE_USLEEP
+#cgo CFLAGS: -DSQLITE_ENABLE_STAT2
+#cgo CFLAGS: -DSQLITE_DEFAULT_MEMSTATUS=0
+#cgo CFLAGS: -DSQLITE_DEFAULT_FILE_PERMISSIONS=0666
+#cgo CFLAGS: -DSQLITE_MAX_VARIABLE_NUMBER=250000
+#cgo CFLAGS: -DSQLITE_MAX_MMAP_SIZE=1099511627776
+#cgo CFLAGS: -DSQLITE_ENABLE_MATH_FUNCTIONS=1
+#cgo CFLAGS: -DSQLITE_ENABLE_REGEXP=1
+#cgo CFLAGS: -DSQLITE_ENABLE_VSV=1
+#cgo CFLAGS: -DSQLITE_MAX_LENGTH=2147483647
+#cgo CFLAGS: -DSQLITE_MAX_COLUMN=32767
+#cgo CFLAGS: -DSQLITE_MAX_SQL_LENGTH=1073741824
+#cgo CFLAGS: -DSQLITE_MAX_FUNCTION_ARG=127
+#cgo CFLAGS: -DSQLITE_MAX_ATTACHED=125
+#cgo CFLAGS: -DSQLITE_MAX_PAGE_COUNT=4294967294
+#cgo CFLAGS: -DNDEBUG
+
 #cgo CFLAGS: -Wno-deprecated-declarations
-#cgo linux,!android CFLAGS: -DHAVE_PREAD64=1 -DHAVE_PWRITE64=1
+#cgo linux,!android CFLAGS: -DHAVE_PREAD64=1 -DHAVE_PWRITE64=1 -march=native
+
 #ifndef USE_LIBSQLITE3
 #include <sqlite3-binding.h>
 #else
@@ -48,20 +94,20 @@ package sqlite3
 static int
 _sqlite3_open_v2(const char *filename, sqlite3 **ppDb, int flags, const char *zVfs) {
 #ifdef SQLITE_OPEN_URI
-  return sqlite3_open_v2(filename, ppDb, flags | SQLITE_OPEN_URI, zVfs);
+ return sqlite3_open_v2(filename, ppDb, flags | SQLITE_OPEN_URI, zVfs);
 #else
-  return sqlite3_open_v2(filename, ppDb, flags, zVfs);
+ return sqlite3_open_v2(filename, ppDb, flags, zVfs);
 #endif
 }
 
 static int
 _sqlite3_bind_text(sqlite3_stmt *stmt, int n, char *p, int np) {
-  return sqlite3_bind_text(stmt, n, p, np, SQLITE_TRANSIENT);
+ return sqlite3_bind_text(stmt, n, p, np, SQLITE_TRANSIENT);
 }
 
 static int
 _sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
-  return sqlite3_bind_blob(stmt, n, p, np, SQLITE_TRANSIENT);
+ return sqlite3_bind_blob(stmt, n, p, np, SQLITE_TRANSIENT);
 }
 
 #include <stdio.h>
@@ -70,10 +116,10 @@ _sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
 static int
 _sqlite3_exec(sqlite3* db, const char* pcmd, long long* rowid, long long* changes)
 {
-  int rv = sqlite3_exec(db, pcmd, 0, 0, 0);
-  *rowid = (long long) sqlite3_last_insert_rowid(db);
-  *changes = (long long) sqlite3_changes(db);
-  return rv;
+ int rv = sqlite3_exec(db, pcmd, 0, 0, 0);
+ *rowid = (long long) sqlite3_last_insert_rowid(db);
+ *changes = (long long) sqlite3_changes(db);
+ return rv;
 }
 
 #ifdef SQLITE_ENABLE_UNLOCK_NOTIFY
@@ -84,65 +130,65 @@ extern int _sqlite3_prepare_v2_blocking(sqlite3 *db, const char *zSql, int nByte
 static int
 _sqlite3_step_internal(sqlite3_stmt *stmt)
 {
-  return _sqlite3_step_blocking(stmt);
+ return _sqlite3_step_blocking(stmt);
 }
 
 static int
 _sqlite3_step_row_internal(sqlite3_stmt* stmt, long long* rowid, long long* changes)
 {
-  return _sqlite3_step_row_blocking(stmt, rowid, changes);
+ return _sqlite3_step_row_blocking(stmt, rowid, changes);
 }
 
 static int
 _sqlite3_prepare_v2_internal(sqlite3 *db, const char *zSql, int nBytes, sqlite3_stmt **ppStmt, const char **pzTail)
 {
-  return _sqlite3_prepare_v2_blocking(db, zSql, nBytes, ppStmt, pzTail);
+ return _sqlite3_prepare_v2_blocking(db, zSql, nBytes, ppStmt, pzTail);
 }
 
 #else
 static int
 _sqlite3_step_internal(sqlite3_stmt *stmt)
 {
-  return sqlite3_step(stmt);
+ return sqlite3_step(stmt);
 }
 
 static int
 _sqlite3_step_row_internal(sqlite3_stmt* stmt, long long* rowid, long long* changes)
 {
-  int rv = sqlite3_step(stmt);
-  sqlite3* db = sqlite3_db_handle(stmt);
-  *rowid = (long long) sqlite3_last_insert_rowid(db);
-  *changes = (long long) sqlite3_changes(db);
-  return rv;
+ int rv = sqlite3_step(stmt);
+ sqlite3* db = sqlite3_db_handle(stmt);
+ *rowid = (long long) sqlite3_last_insert_rowid(db);
+ *changes = (long long) sqlite3_changes(db);
+ return rv;
 }
 
 static int
 _sqlite3_prepare_v2_internal(sqlite3 *db, const char *zSql, int nBytes, sqlite3_stmt **ppStmt, const char **pzTail)
 {
-  return sqlite3_prepare_v2(db, zSql, nBytes, ppStmt, pzTail);
+ return sqlite3_prepare_v2(db, zSql, nBytes, ppStmt, pzTail);
 }
 #endif
 
 void _sqlite3_result_text(sqlite3_context* ctx, const char* s) {
-  sqlite3_result_text(ctx, s, -1, &free);
+ sqlite3_result_text(ctx, s, -1, &free);
 }
 
 void _sqlite3_result_blob(sqlite3_context* ctx, const void* b, int l) {
-  sqlite3_result_blob(ctx, b, l, SQLITE_TRANSIENT);
+ sqlite3_result_blob(ctx, b, l, SQLITE_TRANSIENT);
 }
 
 
 int _sqlite3_create_function(
-  sqlite3 *db,
-  const char *zFunctionName,
-  int nArg,
-  int eTextRep,
-  uintptr_t pApp,
-  void (*xFunc)(sqlite3_context*,int,sqlite3_value**),
-  void (*xStep)(sqlite3_context*,int,sqlite3_value**),
-  void (*xFinal)(sqlite3_context*)
+ sqlite3 *db,
+ const char *zFunctionName,
+ int nArg,
+ int eTextRep,
+ uintptr_t pApp,
+ void (*xFunc)(sqlite3_context*,int,sqlite3_value**),
+ void (*xStep)(sqlite3_context*,int,sqlite3_value**),
+ void (*xFinal)(sqlite3_context*)
 ) {
-  return sqlite3_create_function(db, zFunctionName, nArg, eTextRep, (void*) pApp, xFunc, xStep, xFinal);
+ return sqlite3_create_function(db, zFunctionName, nArg, eTextRep, (void*) pApp, xFunc, xStep, xFinal);
 }
 
 void callbackTrampoline(sqlite3_context*, int, sqlite3_value**);
@@ -176,15 +222,15 @@ int authorizerTrampoline(void*, int, char*, char*, char*, char*);
 
 static int _sqlite3_limit(sqlite3* db, int limitId, int newLimit) {
 #ifndef _SQLITE_HAS_LIMIT
-  return -1;
+ return -1;
 #else
-  return sqlite3_limit(db, limitId, newLimit);
+ return sqlite3_limit(db, limitId, newLimit);
 #endif
 }
 
 #if SQLITE_VERSION_NUMBER < 3012000
 static int sqlite3_system_errno(sqlite3 *db) {
-  return 0;
+ return 0;
 }
 #endif
 */
